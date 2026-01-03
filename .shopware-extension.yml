@@ -1,0 +1,13 @@
+build:
+  shopwareVersionConstraint: ">=6.5.0 <6.8.0"
+  zip:
+    assets:
+      enabled: false
+      enable_es_build_for_admin: false
+      enable_es_build_for_storefront: false
+
+changelog:
+  enabled: true
+
+store:
+  automatic_bugfix_version_compatibility: true

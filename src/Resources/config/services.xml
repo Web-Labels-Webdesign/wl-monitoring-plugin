@@ -1,0 +1,109 @@
+<?xml version="1.0" ?>
+<container xmlns="http://symfony.com/schema/dic/services"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+
+    <services>
+        <defaults autowire="true" autoconfigure="true" public="false"/>
+
+        <!-- Collector Services -->
+        <service id="WlMonitoring\Service\SystemInfoCollector">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument>%kernel.project_dir%</argument>
+            <argument>%kernel.environment%</argument>
+        </service>
+
+        <service id="WlMonitoring\Service\PluginUpdateChecker">
+            <argument type="service" id="Shopware\Core\Framework\Store\Services\StoreClient"/>
+            <argument type="service" id="cache.object"/>
+        </service>
+
+        <service id="WlMonitoring\Service\PluginInfoCollector">
+            <argument type="service" id="plugin.repository"/>
+            <argument type="service" id="app.repository"/>
+            <argument type="service" id="WlMonitoring\Service\PluginUpdateChecker"/>
+        </service>
+
+        <service id="WlMonitoring\Service\QueueInfoCollector">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="scheduled_task.repository"/>
+            <argument type="service" id="shopware.increment.gateway.registry"/>
+            <argument type="service" id="messenger.receiver_locator"/>
+        </service>
+
+        <service id="WlMonitoring\Service\BusinessMetricsCollector">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+        </service>
+
+        <service id="WlMonitoring\Service\SecurityInfoCollector">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument>%kernel.shopware_version%</argument>
+            <argument>%kernel.project_dir%</argument>
+        </service>
+
+        <service id="WlMonitoring\Service\PerformanceInfoCollector">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument>%kernel.environment%</argument>
+            <argument>%kernel.debug%</argument>
+            <argument>%shopware.admin_worker.enable_admin_worker%</argument>
+        </service>
+
+        <service id="WlMonitoring\Service\LogInfoCollector">
+            <argument>%kernel.logs_dir%</argument>
+        </service>
+
+        <service id="WlMonitoring\Service\CacheInfoCollector">
+            <argument>%kernel.cache_dir%</argument>
+            <argument>%kernel.project_dir%</argument>
+            <argument type="service" id="cache.object"/>
+            <argument type="service" id="cache.http"/>
+        </service>
+
+        <service id="WlMonitoring\Service\ElasticsearchInfoCollector">
+            <argument>%elasticsearch.enabled%</argument>
+            <argument type="service" id="Elasticsearch\Client" on-invalid="null"/>
+        </service>
+
+        <!-- API Controllers -->
+        <service id="WlMonitoring\Controller\Api\SystemInfoController" public="true">
+            <argument type="service" id="WlMonitoring\Service\SystemInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\PluginInfoController" public="true">
+            <argument type="service" id="WlMonitoring\Service\PluginInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\QueueInfoController" public="true">
+            <argument type="service" id="WlMonitoring\Service\QueueInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\BusinessMetricsController" public="true">
+            <argument type="service" id="WlMonitoring\Service\BusinessMetricsCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\HealthController" public="true">
+            <argument type="service" id="WlMonitoring\Service\SystemInfoCollector"/>
+            <argument type="service" id="WlMonitoring\Service\QueueInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\SecurityController" public="true">
+            <argument type="service" id="WlMonitoring\Service\SecurityInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\PerformanceController" public="true">
+            <argument type="service" id="WlMonitoring\Service\PerformanceInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\LogsController" public="true">
+            <argument type="service" id="WlMonitoring\Service\LogInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\CacheController" public="true">
+            <argument type="service" id="WlMonitoring\Service\CacheInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\ElasticsearchController" public="true">
+            <argument type="service" id="WlMonitoring\Service\ElasticsearchInfoCollector"/>
+        </service>
+    </services>
+</container>
