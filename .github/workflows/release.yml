@@ -11,6 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
       - name: Install shopware-cli
         run: |
           wget -q https://github.com/FriendsOfShopware/shopware-cli/releases/latest/download/shopware-cli_Linux_x86_64.tar.gz
@@ -20,13 +24,13 @@ jobs:
       - name: Build plugin
         run: |
           cd ..
-          shopware-cli extension zip wl-monitoring-plugin --disable-git
-          mv WlMonitoring.zip wl-monitoring-plugin/
+          shopware-cli extension zip wl-monitoring-plugin
+          mv WlMonitoring.zip wl-monitoring-plugin/WlMonitoring-${{ steps.version.outputs.VERSION }}.zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: WlMonitoring.zip
+          files: WlMonitoring-${{ steps.version.outputs.VERSION }}.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
