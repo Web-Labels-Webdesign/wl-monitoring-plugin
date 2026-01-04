@@ -11,6 +11,12 @@ class SignatureVerificationService
 {
     private const CONFIG_PREFIX = 'WlMonitoring.config.';
 
+    /**
+     * Maximum allowed signature age in seconds (5 minutes).
+     * This is hardcoded to prevent misconfiguration.
+     */
+    private const MAX_SIGNATURE_AGE = 300;
+
     public function __construct(
         private readonly SystemConfigService $systemConfigService
     ) {
@@ -29,9 +35,7 @@ class SignatureVerificationService
      */
     public function getMaxAge(): int
     {
-        $maxAge = $this->systemConfigService->get(self::CONFIG_PREFIX . 'signatureMaxAge');
-
-        return (int) ($maxAge ?: 300);
+        return self::MAX_SIGNATURE_AGE;
     }
 
     /**

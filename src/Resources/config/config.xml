@@ -16,13 +16,5 @@
             <required>true</required>
         </input-field>
 
-        <input-field type="int">
-            <name>signatureMaxAge</name>
-            <label>Maximum Signature Age (seconds)</label>
-            <label lang="de-DE">Maximales Signaturalter (Sekunden)</label>
-            <helpText>Requests with signatures older than this value will be rejected. Default is 300 seconds (5 minutes).</helpText>
-            <helpText lang="de-DE">Anfragen mit aelteren Signaturen als diesem Wert werden abgelehnt. Standard sind 300 Sekunden (5 Minuten).</helpText>
-            <defaultValue>300</defaultValue>
-        </input-field>
     </card>
 </config>
