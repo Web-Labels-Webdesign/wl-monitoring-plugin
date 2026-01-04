@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/shopware/shopware/trunk/src/Core/System/SystemConfig/Schema/config.xsd">
+    <card>
+        <title>Security Settings</title>
+        <title lang="de-DE">Sicherheitseinstellungen</title>
+
+        <input-field type="textarea">
+            <name>monitoringPublicKey</name>
+            <label>Monitoring App Public Key</label>
+            <label lang="de-DE">Monitoring-App Public Key</label>
+            <placeholder>Paste your monitoring app's public key here...</placeholder>
+            <placeholder lang="de-DE">Fuegen Sie hier den Public Key Ihrer Monitoring-App ein...</placeholder>
+            <helpText>Enter the public key from your monitoring application. All API requests must be signed with the corresponding private key.</helpText>
+            <helpText lang="de-DE">Geben Sie den Public Key Ihrer Monitoring-Anwendung ein. Alle API-Anfragen muessen mit dem entsprechenden privaten Schluessel signiert sein.</helpText>
+            <required>true</required>
+        </input-field>
+
+        <input-field type="int">
+            <name>signatureMaxAge</name>
+            <label>Maximum Signature Age (seconds)</label>
+            <label lang="de-DE">Maximales Signaturalter (Sekunden)</label>
+            <helpText>Requests with signatures older than this value will be rejected. Default is 300 seconds (5 minutes).</helpText>
+            <helpText lang="de-DE">Anfragen mit aelteren Signaturen als diesem Wert werden abgelehnt. Standard sind 300 Sekunden (5 Minuten).</helpText>
+            <defaultValue>300</defaultValue>
+        </input-field>
+    </card>
+</config>

@@ -64,6 +64,16 @@
             <argument type="service" id="Elasticsearch\Client" on-invalid="null"/>
         </service>
 
+        <!-- Signature Verification -->
+        <service id="WlMonitoring\Service\SignatureVerificationService">
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
+        </service>
+
+        <service id="WlMonitoring\Subscriber\SignatureVerificationSubscriber">
+            <argument type="service" id="WlMonitoring\Service\SignatureVerificationService"/>
+            <tag name="kernel.event_subscriber"/>
+        </service>
+
         <!-- API Controllers -->
         <service id="WlMonitoring\Controller\Api\SystemInfoController" public="true">
             <argument type="service" id="WlMonitoring\Service\SystemInfoCollector"/>
