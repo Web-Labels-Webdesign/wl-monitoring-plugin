@@ -9,7 +9,7 @@ use Symfony\Component\Finder\Finder;
 class LogInfoCollector
 {
     private const LOG_PATTERN = '/\[(?<date>[^\]]+)\] (?<channel>\w+)\.(?<level>DEBUG|INFO|NOTICE|WARNING|ERROR|CRITICAL|ALERT|EMERGENCY): (?<message>.*)/';
-    private const MAX_RECENT_ERRORS = 20;
+    private const MAX_RECENT_ERRORS = 100;
 
     public function __construct(
         private readonly string $logDir
