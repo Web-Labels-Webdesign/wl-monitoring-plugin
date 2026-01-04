@@ -163,6 +163,7 @@ class LogInfoCollector
     {
         $errors = [];
         $logDir = rtrim($this->logDir, '/');
+        $oneDayAgo = (new \DateTime())->modify('-24 hours');
 
         foreach ($files as $fileInfo) {
             if (\count($errors) >= self::MAX_RECENT_ERRORS) {
@@ -175,7 +176,7 @@ class LogInfoCollector
                 continue;
             }
 
-            $fileErrors = $this->getErrorsFromFile($filePath, self::MAX_RECENT_ERRORS - \count($errors));
+            $fileErrors = $this->getErrorsFromFile($filePath, self::MAX_RECENT_ERRORS - \count($errors), $oneDayAgo);
             $errors = array_merge($errors, $fileErrors);
         }
 
@@ -188,28 +189,23 @@ class LogInfoCollector
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function getErrorsFromFile(string $filePath, int $limit): array
+    private function getErrorsFromFile(string $filePath, int $limit, \DateTime $cutoffDate): array
     {
         $errors = [];
 
-        // Read file from end for efficiency
-        $lines = [];
         $handle = fopen($filePath, 'r');
         if ($handle === false) {
             return [];
         }
 
-        // Read last 1000 lines max
+        // Read all lines (we need to process in reverse to get most recent first)
         $allLines = [];
         while (($line = fgets($handle)) !== false) {
             $allLines[] = $line;
-            if (\count($allLines) > 1000) {
-                array_shift($allLines);
-            }
         }
         fclose($handle);
 
-        // Process in reverse order
+        // Process in reverse order (newest first)
         $allLines = array_reverse($allLines);
 
         foreach ($allLines as $line) {
@@ -229,8 +225,17 @@ class LogInfoCollector
 
             try {
                 $date = new \DateTime($matches['date']);
+
+                // Skip errors older than 24h cutoff
+                if ($date < $cutoffDate) {
+                    // Since we're processing in reverse chronological order,
+                    // once we hit an old entry, we can stop
+                    break;
+                }
+
                 $dateFormatted = $date->format(\DateTimeInterface::ATOM);
             } catch (\Throwable) {
+                // If date parsing fails, include the error but continue checking others
                 $dateFormatted = $matches['date'];
             }
 
