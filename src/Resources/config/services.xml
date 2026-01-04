@@ -64,6 +64,10 @@
             <argument type="service" id="Elasticsearch\Client" on-invalid="null"/>
         </service>
 
+        <service id="WlMonitoring\Service\ServerHealthCollector">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+        </service>
+
         <!-- Signature Verification -->
         <service id="WlMonitoring\Service\SignatureVerificationService">
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
@@ -114,6 +118,10 @@
 
         <service id="WlMonitoring\Controller\Api\ElasticsearchController" public="true">
             <argument type="service" id="WlMonitoring\Service\ElasticsearchInfoCollector"/>
+        </service>
+
+        <service id="WlMonitoring\Controller\Api\ServerHealthController" public="true">
+            <argument type="service" id="WlMonitoring\Service\ServerHealthCollector"/>
         </service>
     </services>
 </container>
