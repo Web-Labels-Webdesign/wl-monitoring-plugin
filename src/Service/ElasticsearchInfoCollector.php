@@ -65,9 +65,17 @@ class ElasticsearchInfoCollector
         $healthResponse = $cluster->health();
         $health = $this->extractResponseData($healthResponse);
 
+        // Get cluster stats for aggregated metrics
+        $clusterStats = $this->getClusterStats($client);
+
+        // Get node stats for JVM metrics
+        $jvmHeapPercent = $this->getJvmHeapUsedPercent($client);
+
         // Get indices
         $catMethod = [$client, 'cat'];
         $indices = [];
+        $totalDocs = 0;
+        $totalSizeBytes = 0;
 
         if (\is_callable($catMethod)) {
             $cat = $client->cat();
@@ -82,11 +90,16 @@ class ElasticsearchInfoCollector
                         continue;
                     }
 
+                    $docCount = isset($index['docs.count']) ? (int) $index['docs.count'] : 0;
+                    $sizeBytes = $this->parseSizeToBytes($index['store.size'] ?? '0');
+                    $totalDocs += $docCount;
+                    $totalSizeBytes += $sizeBytes;
+
                     $indices[] = [
                         'name' => $indexName,
                         'health' => $index['health'] ?? 'unknown',
-                        'docs' => isset($index['docs.count']) ? (int) $index['docs.count'] : 0,
-                        'size_mb' => $this->parseSize($index['store.size'] ?? '0'),
+                        'docs' => $docCount,
+                        'size_mb' => round($sizeBytes / 1024 / 1024, 2),
                     ];
                 }
             }
@@ -99,7 +112,108 @@ class ElasticsearchInfoCollector
             'nodes' => $health['number_of_nodes'] ?? 0,
             'indices' => $indices,
             'status' => 'ok',
+            // Deep metrics
+            'active_shards' => $health['active_shards'] ?? 0,
+            'unassigned_shards' => $health['unassigned_shards'] ?? 0,
+            'pending_tasks' => $health['number_of_pending_tasks'] ?? 0,
+            'jvm_heap_used_percent' => $jvmHeapPercent,
+            'total_docs' => $totalDocs,
+            'total_size_bytes' => $totalSizeBytes,
+            'query_total' => $clusterStats['query_total'] ?? 0,
+            'query_time_ms' => $clusterStats['query_time_ms'] ?? 0,
+            'indexing_total' => $clusterStats['indexing_total'] ?? 0,
+            'indexing_time_ms' => $clusterStats['indexing_time_ms'] ?? 0,
         ];
+    }
+
+    /**
+     * Get cluster-wide stats for search and indexing metrics.
+     *
+     * @return array<string, int>
+     */
+    private function getClusterStats(object $client): array
+    {
+        try {
+            $statsMethod = [$client, 'cluster'];
+            if (!\is_callable($statsMethod)) {
+                return [];
+            }
+
+            $cluster = $client->cluster();
+            $statsResponse = $cluster->stats();
+            $stats = $this->extractResponseData($statsResponse);
+
+            return [
+                'query_total' => (int) ($stats['indices']['search']['query_total'] ?? 0),
+                'query_time_ms' => (int) ($stats['indices']['search']['query_time_in_millis'] ?? 0),
+                'indexing_total' => (int) ($stats['indices']['indexing']['index_total'] ?? 0),
+                'indexing_time_ms' => (int) ($stats['indices']['indexing']['index_time_in_millis'] ?? 0),
+            ];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Get average JVM heap usage across all nodes.
+     */
+    private function getJvmHeapUsedPercent(object $client): ?float
+    {
+        try {
+            $nodesMethod = [$client, 'nodes'];
+            if (!\is_callable($nodesMethod)) {
+                return null;
+            }
+
+            $nodes = $client->nodes();
+            $statsResponse = $nodes->stats(['metric' => 'jvm']);
+            $stats = $this->extractResponseData($statsResponse);
+
+            $nodeStats = $stats['nodes'] ?? [];
+            if (empty($nodeStats)) {
+                return null;
+            }
+
+            $totalPercent = 0;
+            $nodeCount = 0;
+
+            foreach ($nodeStats as $node) {
+                if (isset($node['jvm']['mem']['heap_used_percent'])) {
+                    $totalPercent += (float) $node['jvm']['mem']['heap_used_percent'];
+                    $nodeCount++;
+                }
+            }
+
+            return $nodeCount > 0 ? round($totalPercent / $nodeCount, 1) : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Parse size string to bytes.
+     */
+    private function parseSizeToBytes(string $size): int
+    {
+        $size = strtolower(trim($size));
+
+        if (str_ends_with($size, 'gb')) {
+            return (int) ((float) $size * 1024 * 1024 * 1024);
+        }
+
+        if (str_ends_with($size, 'mb')) {
+            return (int) ((float) $size * 1024 * 1024);
+        }
+
+        if (str_ends_with($size, 'kb')) {
+            return (int) ((float) $size * 1024);
+        }
+
+        if (str_ends_with($size, 'b')) {
+            return (int) $size;
+        }
+
+        return 0;
     }
 
     private function extractResponseData(mixed $response): mixed

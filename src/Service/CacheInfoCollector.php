@@ -160,6 +160,7 @@ class CacheInfoCollector
             $info = $redis->info();
 
             return [
+                // Basic info
                 'version' => $info['redis_version'] ?? null,
                 'used_memory' => (int) ($info['used_memory'] ?? 0),
                 'used_memory_human' => $info['used_memory_human'] ?? null,
@@ -167,10 +168,39 @@ class CacheInfoCollector
                 'maxmemory_human' => $info['maxmemory_human'] ?? null,
                 'connected_clients' => (int) ($info['connected_clients'] ?? 0),
                 'uptime_days' => (int) ($info['uptime_in_days'] ?? 0),
+                // Performance metrics
+                'ops_per_sec' => (int) ($info['instantaneous_ops_per_sec'] ?? 0),
+                'hit_rate' => $this->calculateRedisHitRate($info),
+                'memory_fragmentation_ratio' => (float) ($info['mem_fragmentation_ratio'] ?? 1.0),
+                // Client metrics
+                'blocked_clients' => (int) ($info['blocked_clients'] ?? 0),
+                // Key metrics
+                'evicted_keys' => (int) ($info['evicted_keys'] ?? 0),
+                'expired_keys' => (int) ($info['expired_keys'] ?? 0),
+                'keyspace_hits' => (int) ($info['keyspace_hits'] ?? 0),
+                'keyspace_misses' => (int) ($info['keyspace_misses'] ?? 0),
+                // Connection metrics
+                'total_connections_received' => (int) ($info['total_connections_received'] ?? 0),
+                'rejected_connections' => (int) ($info['rejected_connections'] ?? 0),
+                // Persistence metrics
+                'rdb_last_save_time' => (int) ($info['rdb_last_save_time'] ?? 0),
+                'rdb_changes_since_last_save' => (int) ($info['rdb_changes_since_last_save'] ?? 0),
             ];
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Calculate Redis cache hit rate percentage.
+     */
+    private function calculateRedisHitRate(array $info): ?float
+    {
+        $hits = (int) ($info['keyspace_hits'] ?? 0);
+        $misses = (int) ($info['keyspace_misses'] ?? 0);
+        $total = $hits + $misses;
+
+        return $total > 0 ? round(($hits / $total) * 100, 2) : null;
     }
 
     private function getFilesystemSize(FilesystemAdapter $adapter): int
