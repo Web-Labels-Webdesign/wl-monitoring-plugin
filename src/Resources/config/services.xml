@@ -31,8 +31,13 @@
             <argument type="service" id="messenger.receiver_locator"/>
         </service>
 
+        <service id="WlMonitoring\Service\SearchLogService">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+        </service>
+
         <service id="WlMonitoring\Service\BusinessMetricsCollector">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="WlMonitoring\Service\SearchLogService"/>
         </service>
 
         <service id="WlMonitoring\Service\SecurityInfoCollector">
@@ -75,6 +80,11 @@
 
         <service id="WlMonitoring\Subscriber\SignatureVerificationSubscriber">
             <argument type="service" id="WlMonitoring\Service\SignatureVerificationService"/>
+            <tag name="kernel.event_subscriber"/>
+        </service>
+
+        <service id="WlMonitoring\Subscriber\SearchLogSubscriber">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
             <tag name="kernel.event_subscriber"/>
         </service>
 

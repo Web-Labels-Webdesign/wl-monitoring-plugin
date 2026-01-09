@@ -9,7 +9,8 @@ use Doctrine\DBAL\Connection;
 class BusinessMetricsCollector
 {
     public function __construct(
-        private readonly Connection $connection
+        private readonly Connection $connection,
+        private readonly SearchLogService $searchLogService
     ) {
     }
 
@@ -446,52 +447,12 @@ class BusinessMetricsCollector
 
     /**
      * Search analytics - top searches and failed searches.
-     * Requires Elasticsearch/OpenSearch with search logging, or returns empty if not available.
+     * Uses the SearchLogService which logs actual user searches.
      *
      * @return array<string, mixed>
      */
     private function getSearchAnalytics(): array
     {
-        try {
-            // Check if product_search_keyword table exists (Shopware 6.4+)
-            $tableExists = $this->connection->fetchOne(
-                "SELECT COUNT(*) FROM information_schema.tables
-                WHERE table_schema = DATABASE() AND table_name = 'product_search_keyword'"
-            );
-
-            if (!$tableExists) {
-                return [
-                    'available' => false,
-                    'message' => 'Search analytics not available',
-                ];
-            }
-
-            // Top search keywords (from product_search_keyword which stores indexed terms)
-            // Note: Shopware doesn't log actual searches by default, only indexed keywords
-            // This is a placeholder - real search logging would need a custom implementation
-            $topKeywords = $this->connection->fetchAllAssociative(
-                "SELECT keyword, COUNT(*) as count
-                FROM product_search_keyword
-                GROUP BY keyword
-                ORDER BY count DESC
-                LIMIT 20"
-            );
-
-            return [
-                'available' => true,
-                'indexed_keywords' => array_map(function ($row) {
-                    return [
-                        'term' => mb_substr($row['keyword'] ?? '', 0, 50), // Truncate for privacy
-                        'count' => (int) ($row['count'] ?? 0),
-                    ];
-                }, $topKeywords),
-                'note' => 'Shows indexed search keywords, not actual user searches. Consider implementing search logging for detailed analytics.',
-            ];
-        } catch (\Throwable $e) {
-            return [
-                'available' => false,
-                'error' => $e->getMessage(),
-            ];
-        }
+        return $this->searchLogService->getAnalytics();
     }
 }
