@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-01-09
+
+### Added
+- **System RAM Monitoring**: Real-time OS-level memory usage tracking
+  - Linux support via `/proc/meminfo` parsing
+  - macOS/BSD fallback via `sysctl` and `vm_stat`
+  - Returns: total_mb, available_mb, used_mb, usage_percent
+  - Swap memory tracking: swap_total_mb, swap_used_mb, swap_free_mb
+  - Included in server-health endpoint response under `memory` key
+
 ## [2.5.0] - 2026-01-09
 
 ### Added

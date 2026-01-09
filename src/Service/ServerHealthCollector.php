@@ -20,6 +20,7 @@ class ServerHealthCollector
     {
         return [
             'cpu' => $this->getCpuInfo(),
+            'memory' => $this->getMemoryInfo(),
             'php_fpm' => $this->getPhpFpmStats(),
             'mysql' => $this->getMysqlDeepStats(),
         ];
@@ -77,6 +78,133 @@ class ServerHealthCollector
         }
 
         return null;
+    }
+
+    /**
+     * Get system memory (RAM) information.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function getMemoryInfo(): ?array
+    {
+        // Try Linux /proc/meminfo first
+        if (is_readable('/proc/meminfo')) {
+            return $this->parseLinuxMemInfo();
+        }
+
+        // Fallback for macOS/BSD
+        return $this->getMacOsMemInfo();
+    }
+
+    /**
+     * Parse memory info from Linux /proc/meminfo.
+     *
+     * @return array<string, int|float>|null
+     */
+    private function parseLinuxMemInfo(): ?array
+    {
+        $meminfo = @file_get_contents('/proc/meminfo');
+        if ($meminfo === false) {
+            return null;
+        }
+
+        $values = [];
+        $lines = explode("\n", $meminfo);
+        foreach ($lines as $line) {
+            if (preg_match('/^(\w+):\s+(\d+)\s+kB/', $line, $matches)) {
+                $values[$matches[1]] = (int) $matches[2];
+            }
+        }
+
+        $totalKb = $values['MemTotal'] ?? 0;
+        $freeKb = $values['MemFree'] ?? 0;
+        $availableKb = $values['MemAvailable'] ?? null;
+        $buffersKb = $values['Buffers'] ?? 0;
+        $cachedKb = $values['Cached'] ?? 0;
+        $swapTotalKb = $values['SwapTotal'] ?? 0;
+        $swapFreeKb = $values['SwapFree'] ?? 0;
+
+        // MemAvailable is preferred (kernel 3.14+), fallback to free+buffers+cached
+        if ($availableKb === null) {
+            $availableKb = $freeKb + $buffersKb + $cachedKb;
+        }
+
+        $usedKb = $totalKb - $availableKb;
+        $swapUsedKb = $swapTotalKb - $swapFreeKb;
+
+        $totalMb = (int) round($totalKb / 1024);
+        $availableMb = (int) round($availableKb / 1024);
+        $usedMb = (int) round($usedKb / 1024);
+        $usagePercent = $totalKb > 0 ? round(($usedKb / $totalKb) * 100, 2) : 0;
+
+        return [
+            'total_mb' => $totalMb,
+            'available_mb' => $availableMb,
+            'used_mb' => $usedMb,
+            'usage_percent' => $usagePercent,
+            'swap_total_mb' => (int) round($swapTotalKb / 1024),
+            'swap_used_mb' => (int) round($swapUsedKb / 1024),
+            'swap_free_mb' => (int) round($swapFreeKb / 1024),
+        ];
+    }
+
+    /**
+     * Get memory info on macOS/BSD using sysctl and vm_stat.
+     *
+     * @return array<string, int|float>|null
+     */
+    private function getMacOsMemInfo(): ?array
+    {
+        // Get total memory via sysctl
+        $totalBytes = @shell_exec('sysctl -n hw.memsize 2>/dev/null');
+        if ($totalBytes === null || $totalBytes === false) {
+            return null;
+        }
+
+        $totalMb = (int) round((int) trim($totalBytes) / 1024 / 1024);
+
+        // Try to get page size and free pages from vm_stat
+        $vmStat = @shell_exec('vm_stat 2>/dev/null');
+        if ($vmStat === null || $vmStat === false) {
+            return [
+                'total_mb' => $totalMb,
+                'available_mb' => null,
+                'used_mb' => null,
+                'usage_percent' => null,
+                'swap_total_mb' => null,
+                'swap_used_mb' => null,
+                'swap_free_mb' => null,
+            ];
+        }
+
+        // Parse vm_stat output
+        $pageSize = 4096; // Default page size
+        if (preg_match('/page size of (\d+) bytes/', $vmStat, $m)) {
+            $pageSize = (int) $m[1];
+        }
+
+        $freePages = 0;
+        $inactivePages = 0;
+        if (preg_match('/Pages free:\s+(\d+)/', $vmStat, $m)) {
+            $freePages = (int) $m[1];
+        }
+        if (preg_match('/Pages inactive:\s+(\d+)/', $vmStat, $m)) {
+            $inactivePages = (int) $m[1];
+        }
+
+        $availableMb = (int) round(($freePages + $inactivePages) * $pageSize / 1024 / 1024);
+        $usedMb = $totalMb - $availableMb;
+        $usagePercent = $totalMb > 0 ? round(($usedMb / $totalMb) * 100, 2) : 0;
+
+        return [
+            'total_mb' => $totalMb,
+            'available_mb' => $availableMb,
+            'used_mb' => $usedMb,
+            'usage_percent' => $usagePercent,
+            'swap_total_mb' => null,
+            'swap_used_mb' => null,
+            'swap_free_mb' => null,
+        ];
     }
 
     /**
