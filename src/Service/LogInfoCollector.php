@@ -10,6 +10,8 @@ class LogInfoCollector
 {
     private const LOG_PATTERN = '/\[(?<date>[^\]]+)\] (?<channel>\w+)\.(?<level>DEBUG|INFO|NOTICE|WARNING|ERROR|CRITICAL|ALERT|EMERGENCY): (?<message>.*)/';
     private const MAX_RECENT_ERRORS = 100;
+    private const MAX_FILE_SIZE_FULL_READ = 50 * 1024 * 1024;  // 50MB - files larger than this use tail reading
+    private const TAIL_READ_SIZE = 5 * 1024 * 1024;            // 5MB - amount to read from end of large files
 
     public function __construct(
         private readonly string $logDir
@@ -107,9 +109,25 @@ class LogInfoCollector
      */
     private function parseLogFile(string $filePath, array &$stats, \DateTime $oneDayAgo, \DateTime $sevenDaysAgo): void
     {
+        $fileSize = filesize($filePath);
+        if ($fileSize === false) {
+            return;
+        }
+
         $handle = fopen($filePath, 'r');
         if ($handle === false) {
             return;
+        }
+
+        // For large files, only parse the tail (recent entries are at the end)
+        if ($fileSize > self::MAX_FILE_SIZE_FULL_READ) {
+            $readFrom = max(0, $fileSize - self::TAIL_READ_SIZE);
+            fseek($handle, $readFrom);
+
+            // Skip partial first line (we may have seeked into middle of a line)
+            if ($readFrom > 0) {
+                fgets($handle);
+            }
         }
 
         while (($line = fgets($handle)) !== false) {
@@ -192,13 +210,29 @@ class LogInfoCollector
     private function getErrorsFromFile(string $filePath, int $limit, \DateTime $cutoffDate): array
     {
         $errors = [];
+        $fileSize = filesize($filePath);
+
+        if ($fileSize === false) {
+            return [];
+        }
 
         $handle = fopen($filePath, 'r');
         if ($handle === false) {
             return [];
         }
 
-        // Read all lines (we need to process in reverse to get most recent first)
+        // For large files, only read the tail to avoid memory exhaustion
+        if ($fileSize > self::MAX_FILE_SIZE_FULL_READ) {
+            $readFrom = max(0, $fileSize - self::TAIL_READ_SIZE);
+            fseek($handle, $readFrom);
+
+            // Skip partial first line (we may have seeked into middle of a line)
+            if ($readFrom > 0) {
+                fgets($handle);
+            }
+        }
+
+        // Read lines into array
         $allLines = [];
         while (($line = fgets($handle)) !== false) {
             $allLines[] = $line;

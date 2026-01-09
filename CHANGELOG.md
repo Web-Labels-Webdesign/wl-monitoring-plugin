@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-01-09
+
+### Fixed
+- **Large log file handling**: Files >2GB no longer crash the sync
+  - Added file size threshold (50MB) for full-file reads
+  - Large files now use `fseek()` to read only the last 5MB
+  - Prevents out-of-memory errors while still capturing recent log entries
+
 ## [2.4.0] - 2026-01-09
 
 ### Added
