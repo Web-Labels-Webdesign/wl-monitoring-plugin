@@ -6,8 +6,11 @@ namespace WlMonitoring\Subscriber;
 
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Content\Product\Events\ProductSearchResultEvent;
+use Shopware\Core\Content\Product\Events\ProductSuggestResultEvent;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpFoundation\Request;
 
 class SearchLogSubscriber implements EventSubscriberInterface
 {
@@ -20,22 +23,43 @@ class SearchLogSubscriber implements EventSubscriberInterface
     {
         return [
             ProductSearchResultEvent::class => 'onSearchResult',
+            ProductSuggestResultEvent::class => 'onSuggestResult',
         ];
     }
 
     public function onSearchResult(ProductSearchResultEvent $event): void
     {
+        $this->logSearch(
+            $event->getRequest(),
+            $event->getSalesChannelContext(),
+            $event->getResult()->getTotal(),
+            'search'
+        );
+    }
+
+    public function onSuggestResult(ProductSuggestResultEvent $event): void
+    {
+        $this->logSearch(
+            $event->getRequest(),
+            $event->getSalesChannelContext(),
+            $event->getResult()->getTotal(),
+            'suggest'
+        );
+    }
+
+    private function logSearch(
+        Request $request,
+        SalesChannelContext $context,
+        int $resultCount,
+        string $searchType
+    ): void {
         try {
-            $request = $event->getRequest();
             $searchTerm = $request->query->get('search', '');
 
             // Skip empty searches or very short terms
             if (strlen($searchTerm) < 2) {
                 return;
             }
-
-            $result = $event->getResult();
-            $context = $event->getSalesChannelContext();
 
             // Get customer ID if logged in
             $customer = $context->getCustomer();
@@ -52,8 +76,9 @@ class SearchLogSubscriber implements EventSubscriberInterface
             $this->connection->insert('wl_search_log', [
                 'id' => Uuid::randomBytes(),
                 'search_term' => mb_substr($searchTerm, 0, 255),
+                'search_type' => $searchType,
                 'sales_channel_id' => Uuid::fromHexToBytes($context->getSalesChannelId()),
-                'result_count' => $result->getTotal(),
+                'result_count' => $resultCount,
                 'customer_id' => $customerId,
                 'session_id' => $sessionId,
                 'ip_hash' => $ipHash,

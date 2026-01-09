@@ -31,6 +31,7 @@ class SearchLogService
             return [
                 'available' => true,
                 'overview' => $this->getOverview(),
+                'type_breakdown' => $this->getTypeBreakdown(),
                 'top_searches' => $this->getTopSearches(),
                 'failed_searches' => $this->getFailedSearches(),
                 'trending' => $this->getTrendingSearches(),
@@ -118,6 +119,88 @@ class SearchLogService
             'this_month' => [
                 'total_searches' => (int) ($month['total_searches'] ?? 0),
                 'unique_terms' => (int) ($month['unique_terms'] ?? 0),
+            ],
+        ];
+    }
+
+    /**
+     * Get search type breakdown (search vs suggest).
+     *
+     * @return array<string, mixed>
+     */
+    private function getTypeBreakdown(): array
+    {
+        // Check if search_type column exists (for backwards compatibility)
+        $columnExists = $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+            AND table_name = 'wl_search_log'
+            AND column_name = 'search_type'"
+        );
+
+        if (!$columnExists) {
+            return [
+                'available' => false,
+                'message' => 'Run migrations to enable search type tracking.',
+            ];
+        }
+
+        // Today's breakdown
+        $today = $this->connection->fetchAllAssociative(
+            "SELECT
+                search_type,
+                COUNT(*) as count,
+                COUNT(DISTINCT search_term) as unique_terms,
+                SUM(CASE WHEN result_count = 0 THEN 1 ELSE 0 END) as zero_results
+            FROM wl_search_log
+            WHERE DATE(created_at) = CURDATE()
+            GROUP BY search_type"
+        );
+
+        // This week's breakdown
+        $week = $this->connection->fetchAllAssociative(
+            "SELECT
+                search_type,
+                COUNT(*) as count,
+                COUNT(DISTINCT search_term) as unique_terms
+            FROM wl_search_log
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            GROUP BY search_type"
+        );
+
+        // Convert to associative arrays
+        $todayByType = [];
+        foreach ($today as $row) {
+            $type = $row['search_type'] ?? 'search';
+            $count = (int) ($row['count'] ?? 0);
+            $zeroResults = (int) ($row['zero_results'] ?? 0);
+            $todayByType[$type] = [
+                'count' => $count,
+                'unique_terms' => (int) ($row['unique_terms'] ?? 0),
+                'zero_result_rate' => $count > 0
+                    ? round(($zeroResults / $count) * 100, 1)
+                    : 0,
+            ];
+        }
+
+        $weekByType = [];
+        foreach ($week as $row) {
+            $type = $row['search_type'] ?? 'search';
+            $weekByType[$type] = [
+                'count' => (int) ($row['count'] ?? 0),
+                'unique_terms' => (int) ($row['unique_terms'] ?? 0),
+            ];
+        }
+
+        return [
+            'available' => true,
+            'today' => [
+                'search' => $todayByType['search'] ?? ['count' => 0, 'unique_terms' => 0, 'zero_result_rate' => 0],
+                'suggest' => $todayByType['suggest'] ?? ['count' => 0, 'unique_terms' => 0, 'zero_result_rate' => 0],
+            ],
+            'this_week' => [
+                'search' => $weekByType['search'] ?? ['count' => 0, 'unique_terms' => 0],
+                'suggest' => $weekByType['suggest'] ?? ['count' => 0, 'unique_terms' => 0],
             ],
         ];
     }
